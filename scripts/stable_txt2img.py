@@ -1,4 +1,5 @@
 import argparse, os, sys, glob
+import json
 import torch
 import numpy as np
 from omegaconf import OmegaConf
@@ -179,7 +180,13 @@ def main():
     parser.add_argument(
         "--embedding_path", 
         type=str, 
-        help="Path to a pre-trained embedding manager checkpoint")
+        help="Path to a pre-trained embedding manager checkpoint"
+    )
+    parser.add_argument(
+        "--store_prompt_conf",
+        action='store_true',
+        help="write a json file with all the parameters/flags used when running a prompt",
+    )
 
     opt = parser.parse_args()
 
@@ -280,7 +287,9 @@ def main():
                     Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'{prompt[:180].replace(" ", "-")}-{grid_count:04}.jpg'))
                     grid_count += 1
                     
-                    
+                    if opt.store_prompt_conf:
+                        with open(os.path.splitext(grid_filename)[0] + '.json', "w") as f:
+                            f.write(json.dumps(opt.__dict__, indent=4))
 
                 toc = time.time()
 
