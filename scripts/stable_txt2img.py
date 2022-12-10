@@ -23,11 +23,40 @@ def chunk(it, size):
     return iter(lambda: tuple(islice(it, size)), ())
 
 
-def load_model_from_config(config, ckpt, verbose=False):
+def load_model_from_config(config, ckpt, vae_ckpt, verbose=False):
     print(f"Loading model from {ckpt}")
     pl_sd = torch.load(ckpt, map_location="cpu")
     if "global_step" in pl_sd:
         print(f"Global Step: {pl_sd['global_step']}")
+        
+
+        
+    sd = pl_sd["state_dict"]
+    model = instantiate_from_config(config.model)
+    if vae_ckpt:
+        ckpt=torch.load(vae_ckpt, map_location="cpu")
+        loss = []
+        for i in ckpt["state_dict"].keys():
+            if i[0:4] == "loss":
+                loss.append(i)
+        for i in loss:
+            del ckpt["state_dict"][i]
+        m, u = model.load_state_dict(ckpt["state_dict"],strict=False)
+    else:
+        m, u = model.load_state_dict(sd, strict=False)
+    if len(m) > 0 and verbose:
+        print("missing keys:")
+        print(m)
+    if len(u) > 0 and verbose:
+        print("unexpected keys:")
+        print(u)
+
+    model.cuda()
+    model.eval()
+    return model
+
+ 
+
     sd = pl_sd["state_dict"]
     model = instantiate_from_config(config.model)
     m, u = model.load_state_dict(sd, strict=False)
@@ -169,6 +198,14 @@ def main():
         default="models/ldm/stable-diffusion-v1/model.ckpt",
         help="path to checkpoint of model",
     )    
+    
+    parser.add_argument(
+        "--vae_ckpt",
+        type=str,
+        default="models/ldm/stable-diffusion-v1/vae_model.ckpt",
+        help="path to VAE model",
+    )  
+        
     parser.add_argument(
         "--seed",
         type=int,
@@ -206,7 +243,7 @@ def main():
     seed_everything(opt.seed)
 
     config = OmegaConf.load(f"{opt.config}")
-    model = load_model_from_config(config, f"{opt.ckpt}")
+    model = load_model_from_config(config, f"{opt.ckpt}", f"{opt.vae_ckpt}")
     #model.embedding_manager.load(opt.embedding_path)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
