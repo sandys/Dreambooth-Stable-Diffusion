@@ -34,14 +34,9 @@ def load_model_from_config(config, ckpt, vae_ckpt, verbose=False):
     sd = pl_sd["state_dict"]
     model = instantiate_from_config(config.model)
     if vae_ckpt:
-        ckpt=torch.load(vae_ckpt, map_location="cpu")
-        loss = []
-        for i in ckpt["state_dict"].keys():
-            if i[0:4] == "loss":
-                loss.append(i)
-        for i in loss:
-            del ckpt["state_dict"][i]
-        m, u = model.load_state_dict(ckpt["state_dict"],strict=False)
+        vae_ckpt=torch.load(vae_ckpt, map_location="cpu")
+        vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+        m, u = model.load_state_dict(vae_dict,strict=False)
     else:
         m, u = model.load_state_dict(sd, strict=False)
     if len(m) > 0 and verbose:
