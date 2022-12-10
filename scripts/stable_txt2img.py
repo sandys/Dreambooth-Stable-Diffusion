@@ -54,6 +54,13 @@ def main():
         help="the prompt to render"
     )
     parser.add_argument(
+        "--neg_prompt",
+        type=str,
+        nargs="?",
+        default="a painting of a pink eared monster playing guitar",
+        help="the negative prompt"
+    )
+    parser.add_argument(
         "--outdir",
         type=str,
         nargs="?",
@@ -217,8 +224,11 @@ def main():
     n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
     if not opt.from_file:
         prompt = opt.prompt
+        neg_prompt = opt.neg_prompt
         assert prompt is not None
+        assert neg_prompt is not None
         data = [batch_size * [prompt]]
+        neg_data = [batch_size * [neg_prompt]]
 
     else:
         print(f"reading prompts from {opt.from_file}")
@@ -243,12 +253,33 @@ def main():
                 all_samples = list()
                 for n in trange(opt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
-                        uc = None
-                        if opt.scale != 1.0:
-                            uc = model.get_learned_conditioning(batch_size * [""])
+                        # uc = None
+                        # if opt.scale != 1.0:
+                        #     uc = model.get_learned_conditioning(neg_prompt)
                         if isinstance(prompts, tuple):
                             prompts = list(prompts)
                         c = model.get_learned_conditioning(prompts)
+
+                    for neg_prompts in tqdm(neg_data, desc="data"):
+                        # uc = None
+                        # if opt.scale != 1.0:
+                        #     uc = model.get_learned_conditioning(neg_prompt)
+                        if isinstance(neg_prompts, tuple):
+                            neg_prompts = list(neg_prompts)
+                        uc = model.get_learned_conditioning(neg_prompts)
+                        
+                                # for DDIM, shapes must match, we can't just process cond and uncond independently;
+                        # filling unconditional_conditioning with repeats of the last vector to match length is
+                        # not 100% correct but should work well enough
+#                         if uc.shape[1] < c.shape[1]:
+#                             last_vector = uc[:, -1:]
+#                             last_vector_repeated = last_vector.repeat([1, c.shape[1] - uc.shape[1], 1])
+#                             uc = torch.hstack([uc, last_vector_repeated])
+#                         elif uc.shape[1] > c.shape[1]:
+#                             uc = uc[:, :c.shape[1]]
+                        
+#                         uc = model.get_learned_conditioning(batch_size * [""])
+                            
                         shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
                         samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
                                                          conditioning=c,
